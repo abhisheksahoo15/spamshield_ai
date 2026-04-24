@@ -59,6 +59,25 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_BC49B0FDE2CE4E689FD76951812DEA24 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_9556AA34B40E451BBDD306A6134C0A9B }}
 
+      - name: Configure App Service Python runtime and startup command
+        run: |
+          RG_NAME=$(az webapp list --query "[?name=='Spamshield'].resourceGroup | [0]" -o tsv)
+          if [ -z "$RG_NAME" ]; then
+            echo "Could not find resource group for app: Spamshield"
+            exit 1
+          fi
+
+          az webapp config set \
+            --name Spamshield \
+            --resource-group "$RG_NAME" \
+            --linux-fx-version "PYTHON|3.12" \
+            --startup-file "gunicorn -k uvicorn.workers.UvicornWorker --bind=0.0.0.0 --timeout 600 main:app"
+
+          az webapp config appsettings set \
+            --name Spamshield \
+            --resource-group "$RG_NAME" \
+            --settings SCM_DO_BUILD_DURING_DEPLOYMENT=true ENABLE_ORYX_BUILD=true
+
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
